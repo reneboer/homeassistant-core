@@ -13,6 +13,7 @@ from renault_api.kamereon.exceptions import (
     KamereonResponseException,
     NotSupportedException,
     QuotaLimitException,
+    PrivacyModeOnException,
 )
 from renault_api.kamereon.models import KamereonVehicleDataAttributes
 
@@ -94,8 +95,14 @@ class RenaultDataUpdateCoordinator(DataUpdateCoordinator[T]):
                 self.assumed_state = True
                 self.logger.warning("Renault API throttled")
                 return self.data
-
             raise UpdateFailed(f"Renault API throttled: {err}") from err
+
+        except PrivacyModeOnException as err:
+            # This means user has not enabled data sharing in vehicle settings
+            if not self._has_already_worked:
+                self.update_interval = None
+                self.access_denied = True
+            raise UpdateFailed(f"This endpoint is in Privacy mode: {err}") from err
 
         except NotSupportedException as err:
             # Disable because the vehicle does not support this Renault endpoint.
